@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'commander/import'
+require 'active_support'
+require 'pivotal2trello'
+
+program :name, 'Pivotal2Trello'
+program :version, Pivotal2Trello::VERSION
+program :description, 'Migrates Pivotal Tracker projects to Trello'
+
+global_option '-c', '--config FILE', String, 'Token configuration file'
+
+command :auth do |c|
+  c.syntax = 'auth'
+  c.description = 'Authenticates with Trello and Pivotal Tracker, and stores the tokens'
+  c.option '--pivotal-tracker-key KEY', String, 'Pivotal Tracker API key'
+  c.option '--trello-app-token', String, 'Trello App token'
+  c.option '--trello-app-secret', String, 'Trello App secret'
+
+  c.action do |args, options|
+    say "Not yet implemented, set environment variables"
+  end
+end
+
+command :'dump pivotal' do |c|
+  c.syntax = 'dump pivotal'
+  c.description = 'debugging: dumps pivotal data'
+
+  c.action Pivotal2Trello::Commands::DumpPivotal
+end
+
+command :migrate do |c|
+  c.syntax = 'migrate'
+  c.description = 'Migrate Pivotal Tracker projects to Trello'
+
+  c.option '--project ID', String, 'Pivotal Tracker project ID'
+  c.option '--organization ID', String, 'Trello organization ID'
+  c.option '--fix-boards', 'Fix up board permissions and lists'
+
+  c.action Pivotal2Trello::Commands::Migrate
+end
