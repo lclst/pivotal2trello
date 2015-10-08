@@ -281,6 +281,9 @@ module Pivotal2Trello
           labels << [label.name, nil]
         end
 
+        # And a label for points assigned to the story
+        labels << ["P#{story.estimate.to_i}", nil] if story.estimate
+
         current_labels = card.labels.map(&:name)
         labels.each do |label|
           name, color = label
