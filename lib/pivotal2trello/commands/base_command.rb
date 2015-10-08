@@ -10,6 +10,7 @@ module Pivotal2Trello
 
         @options = options
         @args = args
+        @debug = options.debug
 
         load_config
       end
@@ -47,6 +48,11 @@ module Pivotal2Trello
           oauth_token: @trello_token,
           oauth_token_secret: @trello_token_secret
         )
+      end
+
+      # Log a debug message
+      def debug(*parts)
+        say "[DEBUG] " + parts.join(" ") if @debug
       end
     end # class DumpPivotal
   end # module Commands

@@ -4,6 +4,9 @@ module Pivotal2Trello
       def initialize(args, options)
         super
 
+        @list_cards = {}
+        @list_for_epic_states = {}
+
         # Default trello board for unmapped items
         default_board = 'Little Things'
 
@@ -19,27 +22,33 @@ module Pivotal2Trello
           return
         end
 
-        project = pivotal.project(options.project)
+        @project = pivotal.project(options.project)
 
-        say "Migrating project #{project.name} (#{project.id})"
+        say "Migrating project #{@project.name} (#{@project.id})"
 
         # Load labels and epics, to map to a board
-        pivotal_labels = {}
-        project.labels.each do |label|
-          pivotal_labels[label.id] = label.name
+        @pivotal_labels = {}
+        @project.labels.each do |label|
+          @pivotal_labels[label.id] = label.name
         end
 
-        pivotal_epics = {}
-        project.epics.each do |epic|
-          pivotal_epics[epic.id] = {name: epic.name, label: epic.label.id}
+        @pivotal_epics = {}
+        @project.epics.each do |epic|
+          @pivotal_epics[epic.id] = {name: epic.name, label: epic.label.id}
+        end
+
+        if options.epic_id
+          @pivotal_epics = {
+            options.epic_id.to_i => @pivotal_epics[options.epic_id.to_i]
+          }
         end
 
         puts "Labels"
-        puts pivotal_labels.inspect
+        puts @pivotal_labels.inspect
         puts
 
         puts "Epics"
-        puts pivotal_epics.inspect
+        puts @pivotal_epics.inspect
         puts
 
         # Create or find organizations boards on Trello
@@ -58,10 +67,10 @@ module Pivotal2Trello
           return
         end
 
-        trello_boards = trello_organization.boards
+        @trello_boards = trello_organization.boards
 
         # Find or create a trash board
-        trash_board = trello_boards.find{|b| b.name == 'Trash'}
+        trash_board = @trello_boards.find{|b| b.name == 'Trash'}
         unless trash_board
           say "Creating private Trash board..."
           trash_board = trello.create(:board,
@@ -71,11 +80,11 @@ module Pivotal2Trello
         end
 
         # Map pivotal epics to trello boards
-        epics_to_boards = {}
-        pivotal_epics.each do |id, epic|
+        @epics_to_boards = {}
+        @pivotal_epics.each do |id, epic|
           new_board = false
           # Look for a board
-          board = trello_boards.find do |b|
+          board = @trello_boards.find do |b|
             b.name == epic[:name]
           end
 
@@ -134,35 +143,181 @@ module Pivotal2Trello
             end
           end
 
-          epics_to_boards[id] = board
+          @epics_to_boards[id] = board
         end
 
-
-
-
-        return
-
-
-        # Load tasks into new boards
+        # Load tasks into boards
         tasks_by_board = {}
-        stories = project.stories
+
+        if options.epic_id
+          # Only stories in the specified epic
+          stories = @project.stories(with_label: @pivotal_labels[@pivotal_epics[options.epic_id][:label]])
+        else
+          # All stories
+          stories = @project.stories
+        end
         num_stories = stories.count
         i = 0
 
         puts "Scanning #{num_stories} stories..."
 
         stories.each do |story|
+          # Progress
           i += 1
-
-          puts story.attributes
-          return if i > 100
 
           if i % 100 == 0
             say "Story %d / %d %0.2f%%" % [i, num_stories, (i/num_stories.to_f)*100.0]
           end
+
+          # Determine the board and list for this story
+          target_board, target_list = find_board_and_list story
+          debug "story: #{story.id} #{story.name}"
+          debug "  -> to board: #{target_board.id} #{target_board.name}"
+          debug "         list: #{target_list.try(:id)} #{target_list.try(:name)}"
+
+          unless options.log_only
+            card = update_or_create_card story, target_board, target_list
+            debug " card: #{card.id} #{card.attributes.inspect}"
+          end
+        end
+      end # def initialize
+
+      # Find the trello board and list for the specified story
+      def find_board_and_list(story)
+        # Find epic labels from story
+        epics = story.labels.map do |label|
+          @pivotal_epics.find {|k,v| v[:label] == label.id}
+        end.compact.uniq
+
+        # Drop little things if others are present
+        if epics.length > 1
+          epics = epics.reject do |epic|
+            epic.last[:name] == 'Little Things'
+          end
         end
 
-      end # def initialize
+        # or add little things if it needs one
+        if epics.length == 0
+          epics = @pivotal_epics.select do |k, v|
+            v[:name] == 'Little Things'
+          end
+        end
+
+        epics = epics.first
+
+        # Find board for this epic
+        target_board = @epics_to_boards[epics.first]
+
+        # And the list, based on the story state
+        target_list = @list_for_epic_states[[epics.first, story.current_state]] ||= begin
+          target_list_name = @list_for_epic_states[[epics.first, story.current_state]] || case story.current_state
+          when 'accepted', 'delivered', 'finished' # done
+            'Done'
+          when 'started' # doing
+            'Doing'
+          when 'unstarted', 'planned' # backlog
+            'Backlog'
+          else # 'unscheduled' # icebox
+            'Icebox'
+          end
+
+          target_board.lists.find do |list|
+            list.name == target_list_name
+          end
+        end
+
+        [target_board, target_list]
+      end
+
+      # Find and update, or create the card for the story in target_board and target_list
+      #
+      # Matches cards based on name
+      def update_or_create_card(story, target_board, target_list)
+        @list_cards[target_list] ||= target_list.cards
+
+        # Find a matching card
+        card = @list_cards[target_list].find do |c|
+          c.name == story.name
+        end
+
+        unless card
+          card = Trello::Card.new
+          card.client = trello
+          card.pos = 'bottom'
+        end
+
+        card.name = story.name
+        card.desc = story.description
+        card.list_id = target_list.id
+        card.save
+
+        # Apply labels.
+        # These use the POST /1/cards/[id]/labels endpoint to assign labels by name and color
+
+        # Array of [name, color] for desired labels
+        labels = []
+
+        # Story type label
+        case story.story_type
+        when 'feature'
+          type_label = 'Feature'
+          type_color = 'blue'
+        when 'bug'
+          type_label = 'Bug'
+          type_color = 'red'
+        when 'chore'
+          type_label = 'Chore'
+          type_color = 'yellow'
+        when 'release'
+          type_label = 'Release'
+          type_color = 'green'
+        end
+
+        labels << [type_label, type_color]
+
+        # And other labels except the epic name
+        story.labels.each do |label|
+          next if @pivotal_epics.any?{|id, epic| epic[:label] == label.id}
+          labels << [label.name, nil]
+        end
+
+        current_labels = card.labels.map(&:name)
+        labels.each do |label|
+          name, color = label
+          unless current_labels.include?(name)
+            trello.post("/cards/#{card.id}/labels", name: name, color: color)
+          end
+        end
+
+        # Story comments
+        story_comments = story.comments
+        story_comments.each do |comment|
+          author = find_person(comment.person_id)
+
+          comment_text = "#{author.name} - #{comment.created_at.strftime("%b %-d, %Y %-l:%M%P")}\n\n"
+          comment_text << comment.text
+
+          # Post the comment unless one exists
+          matching_comment = card.actions.find do |trello_comment|
+            trello_comment.type == 'commentCard' && trello_comment.data['text'].strip == comment_text.strip
+          end
+
+          card.add_comment(comment_text) unless matching_comment
+        end
+
+        card
+      end # def update_or_create_card
+
+      # Find a member of the project for +person_id+
+      def find_person(person_id)
+        @project_people ||= @project.memberships
+
+        person = @project_people.find do |membership|
+          membership.person.id == person_id
+        end
+
+        person.nil? ? nil : person.person
+      end
     end # class DumpPivotal
   end # module Commands
 end # module Pivotal2Trello

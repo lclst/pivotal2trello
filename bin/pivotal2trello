@@ -10,6 +10,7 @@ program :version, Pivotal2Trello::VERSION
 program :description, 'Migrates Pivotal Tracker projects to Trello'
 
 global_option '-c', '--config FILE', String, 'Token configuration file'
+global_option '--debug', 'Enable debug messages'
 
 command :auth do |c|
   c.syntax = 'auth'
@@ -37,6 +38,8 @@ command :migrate do |c|
   c.option '--project ID', String, 'Pivotal Tracker project ID'
   c.option '--organization ID', String, 'Trello organization ID'
   c.option '--fix-boards', 'Fix up board permissions and lists'
+  c.option '--epic-id ID', Integer, 'Only migrate this pivotal epic'
+  c.option '--log-only', 'Do not update cards in trello, only log actions (will still update boards)'
 
   c.action Pivotal2Trello::Commands::Migrate
 end

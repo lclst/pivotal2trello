@@ -1,3 +1,3 @@
-module Pivotal2trello
+module Pivotal2Trello
   VERSION = "0.0.1"
 end
