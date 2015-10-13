@@ -44,3 +44,13 @@ command :migrate do |c|
 
   c.action Pivotal2Trello::Commands::Migrate
 end
+
+command :'add admin' do |c|
+  c.syntax = 'add admin --user SOMETHING'
+  c.description = 'Add a user as an admin to all boards'
+
+  c.option '--user ID', String, 'Trello user id to add'
+  c.option '--organization ID', String, 'Trello organization id'
+
+  c.action Pivotal2Trello::Commands::AddAdmin
+end
