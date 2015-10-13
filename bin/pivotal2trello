@@ -40,6 +40,7 @@ command :migrate do |c|
   c.option '--fix-boards', 'Fix up board permissions and lists'
   c.option '--epic-id ID', Integer, 'Only migrate this pivotal epic'
   c.option '--log-only', 'Do not update cards in trello, only log actions (will still update boards)'
+  c.option '--start-at OFFSET', 'Start card import at OFFSET'
 
   c.action Pivotal2Trello::Commands::Migrate
 end

@@ -159,14 +159,19 @@ module Pivotal2Trello
         num_stories = stories.count
         i = 0
 
-        puts "Scanning #{num_stories} stories..."
+        say "Scanning #{num_stories} stories..."
+        start_at = options.start_at.to_i
+        say "  Starting at #{start_at}" if start_at > 0
 
         stories.each do |story|
           # Progress
           i += 1
 
-          if i % 100 == 0
+          next if i < start_at
+
+          if i % 5 == 0
             say "Story %d / %d %0.2f%%" % [i, num_stories, (i/num_stories.to_f)*100.0]
+            sleep 10
           end
 
           # Determine the board and list for this story
@@ -179,6 +184,8 @@ module Pivotal2Trello
             card = update_or_create_card story, target_board, target_list
             debug " card: #{card.id} #{card.attributes.inspect}"
           end
+
+          sleep 2
         end
       end # def initialize
 
@@ -251,6 +258,8 @@ module Pivotal2Trello
         card.list_id = target_list.id
         card.save
 
+        sleep 0.5
+
         # Apply labels.
         # These use the POST /1/cards/[id]/labels endpoint to assign labels by name and color
 
@@ -289,6 +298,7 @@ module Pivotal2Trello
           name, color = label
           unless current_labels.include?(name)
             trello.post("/cards/#{card.id}/labels", name: name, color: color)
+            sleep 0.5
           end
         end
 
@@ -296,9 +306,10 @@ module Pivotal2Trello
         story_comments = story.comments
         story_comments.each do |comment|
           author = find_person(comment.person_id)
+          author_name = author ? author.name : 'Someone'
 
-          comment_text = "#{author.name} - #{comment.created_at.strftime("%b %-d, %Y %-l:%M%P")}\n\n"
-          comment_text << comment.text
+          comment_text = "#{author_name} - #{comment.created_at.strftime("%b %-d, %Y %-l:%M%P")}\n\n"
+          comment_text << comment.text.to_s
 
           # Post the comment unless one exists
           matching_comment = card.actions.find do |trello_comment|
@@ -306,6 +317,7 @@ module Pivotal2Trello
           end
 
           card.add_comment(comment_text) unless matching_comment
+          sleep 0.5
         end
 
         card
