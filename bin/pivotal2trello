@@ -24,13 +24,6 @@ command :auth do |c|
   end
 end
 
-command :'dump pivotal' do |c|
-  c.syntax = 'dump pivotal'
-  c.description = 'debugging: dumps pivotal data'
-
-  c.action Pivotal2Trello::Commands::DumpPivotal
-end
-
 command :migrate do |c|
   c.syntax = 'migrate'
   c.description = 'Migrate Pivotal Tracker projects to Trello'

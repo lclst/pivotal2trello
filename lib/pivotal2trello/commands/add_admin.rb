@@ -11,10 +11,10 @@ module Pivotal2Trello
         else
           say "Specify trello organization with --organization"
 
-          puts "%24s %s" % ['ID', 'Name']
+          say "%24s %s" % ['ID', 'Name']
 
           trello_user.organizations.each do |org|
-            puts "%24s %s" % [org.id, org.display_name]
+            say "%24s %s" % [org.id, org.display_name]
           end
 
           return
@@ -25,10 +25,10 @@ module Pivotal2Trello
         else
           say "Specify new admin user with --user"
 
-          puts "%24s %s" % ['ID', 'Name']
+          say "%24s %s" % ['ID', 'Name']
 
           trello_organization.members.each do |member|
-            puts "%24s %s (@%s)" % [member.id, member.full_name, member.username]
+            say "%24s %s (@%s)" % [member.id, member.full_name, member.username]
           end
 
           return

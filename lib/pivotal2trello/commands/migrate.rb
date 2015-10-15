@@ -13,10 +13,10 @@ module Pivotal2Trello
         unless options.project
           say "Specify a Pivotal project with --project ID"
 
-          puts "%8s %s" % ['ID', 'Name']
+          say "%8s %s" % ['ID', 'Name']
 
           pivotal.projects.each do |pr|
-            puts "%8s %s" % [pr.id, pr.name]
+            say "%8s %s" % [pr.id, pr.name]
           end
 
           return
@@ -43,13 +43,13 @@ module Pivotal2Trello
           }
         end
 
-        puts "Labels"
-        puts @pivotal_labels.inspect
-        puts
+        debug "Labels"
+        debug @pivotal_labels.inspect
+        debug
 
-        puts "Epics"
-        puts @pivotal_epics.inspect
-        puts
+        debug "Epics"
+        debug @pivotal_epics.inspect
+        debug
 
         # Create or find organizations boards on Trello
         trello_user = trello.find(:member, 'me')
@@ -58,10 +58,10 @@ module Pivotal2Trello
         else
           say "Specify trello organization with --organization"
 
-          puts "%24s %s" % ['ID', 'Name']
+          say "%24s %s" % ['ID', 'Name']
 
           trello_user.organizations.each do |org|
-            puts "%24s %s" % [org.id, org.display_name]
+            say "%24s %s" % [org.id, org.display_name]
           end
 
           return
@@ -96,7 +96,7 @@ module Pivotal2Trello
               'prefs_permissionLevel' => 'org'
             }
 
-            puts "Creating board for #{epic[:name]} with attrs #{board_attributes}..."
+            say "Creating board for #{epic[:name]} with attrs #{board_attributes}..."
 
             board = trello.create(:board, board_attributes)
           end
